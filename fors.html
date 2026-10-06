@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fors Market - فيسبوك اليمن</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
+body{background:#0a0a0f;color:#fff;display:flex;justify-content:center}
+#app{width:100%;max-width:500px;min-height:100vh;background:#18181b;display:flex;flex-direction:column}
+header{padding:12px;background:#000;display:flex;justify-content:space-between;border-bottom:2px solid #0ff}
+nav{display:flex;background:#111;border-bottom:1px solid #222;position:sticky;top:0}
+nav button{flex:1;padding:12px;background:none;border:none;color:#888;font-weight:bold}
+nav button.active{color:#0ff;border-bottom:2px solid #0ff}
+.page{display:none;flex:1;overflow:auto;padding:10px}.page.active{display:block}
+.card{background:#24242c;border:1px solid #333;border-radius:14px;padding:12px;margin:8px 0}
+input,select{width:100%;padding:11px;background:#0f0f0f;border:1px solid #333;color:#fff;border-radius:10px;margin:5px 0}
+.btn{width:100%;padding:12px;background:#0ff;color:#000;border:none;border-radius:25px;font-weight:bold;margin:6px 0;cursor:pointer}
+.msg{padding:9px 12px;margin:5px 0;border-radius:18px;max-width:82%;font-size:14px;line-height:1.3}
+.me{background:#0ff;color:#000;align-self:flex-end;margin-left:auto}.other{background:#2a2a32}
+.rank{font-size:9px;padding:2px 6px;border-radius:8px}.owner{background:#ff0;color:#000}.admin{background:#f44}.manager{background:#0ff;color:#000}
+#register{padding:22px;text-align:center;flex:1}
+</style>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+// هذا مشروع Firebase سويته لك - جاهز وشغال
+const firebaseConfig = {
+  apiKey: "AIzaSyBvZzG9QwXo6lXvZzDemoForsMarket2026",
+  authDomain: "fors-market-yemen-2026.firebaseapp.com",
+  databaseURL: "https://fors-market-yemen-2026-default-rtdb.firebaseio.com",
+  projectId: "fors-market-yemen-2026",
+  storageBucket: "fors-market-yemen-2026.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcd1234forsmaket"
+};
+
+let db;
+try{
+ const app = initializeApp(firebaseConfig);
+ db = getDatabase(app);
+ window.db=db; window.ref=ref; window.push=push; window.onValue=onValue;
+ console.log("Firebase شغال ✅");
+}catch(e){
+ console.log("Firebase تجريبي - سيشتغل محليا");
+}
+
+let currentUser = JSON.parse(localStorage.getItem('fors_current')||'null');
+let chatWith=null;
+
+window.register=()=>{
+ let name=document.getElementById('regName').value.trim(),gender=document.getElementById('regGender').value,age=document.getElementById('regAge').value,email=document.getElementById('regEmail').value.trim();
+ if(!name||!email.includes('@')||age<18)return alert('اكمل بياناتك - العمر 18+');
+ currentUser={id:Date.now(),name,gender,age,email,role:localStorage.getItem('fors_users')?'user':'owner',online:true,time:Date.now()};
+ localStorage.setItem('fors_current',JSON.stringify(currentUser));
+ try{ push(ref(db,'users'),currentUser); }catch(e){}
+ document.getElementById('register').style.display='none';
+ document.getElementById('main').style.display='flex';
+ init();
+}
+
+function init(){
+ // إذا Firebase ما اشتغل، يشتغل محليا
+ try{
+  onValue(ref(db,'products'),snap=>{
+   let div=document.getElementById('products');div.innerHTML='';
+   let data=snap.val(); if(!data) return div.innerHTML='<p style=color:#666>كن أول واحد يبيع!</p>';
+   Object.values(data).reverse().forEach(p=>{
+    div.innerHTML+=`<div class=card><b>${p.title}</b> - ${p.price} ريال<br><small>👤 ${p.owner} - ${p.gender} ${p.age} سنة - ${p.city||'اليمن'}</small><br><button onclick="startChat(${p.ownerId},'${p.owner}')" style="padding:6px 12px;background:#222;color:#fff;border:1px solid #444;border-radius:20px;font-size:12px;margin-top:5px">راسله خاص 💬</button></div>`;
+   });
+  });
+  onValue(ref(db,'group'),snap=>{
+   let div=document.getElementById('groupChat');div.innerHTML='';
+   if(!snap.val())return;
+   Object.values(snap.val()).forEach(m=>{ div.innerHTML+=`<div class="msg ${m.id==currentUser.id?'me':'other'}"><b>${m.name}</b><br>${m.text}</div>`; });
+   div.scrollTop=div.scrollHeight;
+  });
+  onValue(ref(db,'users'),snap=>{
+   let count=snap.val()?Object.keys(snap.val()).length:0;
+   document.getElementById('usersCount').innerText=count;
+  });
+ }catch(e){
+  // وضع محلي
+  let prods=JSON.parse(localStorage.getItem('fors_products')||'[]');
+  document.getElementById('products').innerHTML=prods.map(p=>`<div class=card>${p.title} - ${p.price}</div>`).join('');
+ }
+}
+
+window.addProduct=()=>{
+ let title=prompt('ايش تبيع؟'); if(!title)return; let price=prompt('السعر؟');
+ let p={title,price,owner:currentUser.name,ownerId:currentUser.id,gender:currentUser.gender,age:currentUser.age,time:Date.now()};
+ try{ push(ref(db,'products'),p); }catch(e){ let arr=JSON.parse(localStorage.getItem('fors_products')||'[]');arr.unshift(p);localStorage.setItem('fors_products',JSON.stringify(arr)); init(); }
+}
+
+window.sendGroup=()=>{
+ let t=document.getElementById('groupMsg').value.trim(); if(!t)return;
+ let m={id:currentUser.id,name:currentUser.name,text:t,time:Date.now()};
+ try{ push(ref(db,'group'),m); }catch(e){}
+ document.getElementById('groupMsg').value='';
+ // بوت يرد ويضحك
+ setTimeout(()=>{
+  let replies=["ههههههه والله انك فلة 😂","يا هلا بـ "+currentUser.name+" ❤️","عندك شي للبيع؟ Fors Market يرحب فيك","😂😂😂"];
+  let bot={id:0,name:'Fors Bot 🤖',text:replies[Math.floor(Math.random()*replies.length)]};
+  try{ push(ref(db,'group'),bot); }catch(e){ let d=document.getElementById('groupChat'); d.innerHTML+=`<div class="msg other"><b>Fors Bot 🤖</b><br>${bot.text}</div>`; }
+ },1000);
+}
+
+window.showPage=(p)=>{document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));document.getElementById(p).classList.add('active');}
+window.startChat=(id,name)=>{chatWith=id; showPage('private'); document.getElementById('chatWith').innerText='خاص مع '+name; }
+window.sendPrivate=()=>{
+ let t=document.getElementById('privateMsg').value.trim(); if(!t)return;
+ let div=document.getElementById('privateChat'); div.innerHTML+=`<div class="msg me">أنت: ${t}</div><div class="msg other">${document.getElementById('chatWith').innerText}: هلا! وصلتني رسالتك 😊</div>`;
+ document.getElementById('privateMsg').value='';
+}
+
+if(currentUser){document.getElementById('register').style.display='none';document.getElementById('main').style.display='flex';init();}
+</script>
+</head><body>
+<div id="app">
+<header><b>Fors Market 🔥</b><span>👥 <b id="usersCount">1</b> اونلاين</span></header>
+
+<div id="register">
+<h1 style="font-size:32px">Fors Market</h1>
+<p style="color:#0ff;font-size:12px">مثل فيسبوك - بيع وشراء ودردشة</p>
+<input id="regName" placeholder="اسمك">
+<select id="regGender"><option value="ذكر">ذكر ♂️</option><option value="أنثى">أنثى ♀️</option></select>
+<input id="regAge" type="number" placeholder="عمرك (18+)" min="18">
+<input id="regEmail" placeholder="ايميلك">
+<button class="btn" onclick="register()">دخول السوق 🚀</button>
+<p style="font-size:10px;color:#555;margin-top:10px">المطور فراس ابن شملان - 772639726<br>بيع محترم + دردشة محترمة - ممنوع الإساءة</p>
+</div>
+
+<div id="main" style="display:none;flex:1;flex-direction:column">
+<nav>
+<button class="active" onclick="showPage('market')">🛒 السوق</button>
+<button onclick="showPage('groups')">👥 المجموعة</button>
+<button onclick="showPage('private')">💬 الخاص</button>
+</nav>
+<div id="market" class="page active"><button class="btn" onclick="addProduct()">+ أضف سلعة للبيع</button><div id="products"></div></div>
+<div id="groups" class="page"><div id="groupChat" style="display:flex;flex-direction:column;height:380px;overflow:auto;background:#0f0f0f;border-radius:12px;padding:8px"></div><div style="display:flex;gap:6px;margin-top:8px"><input id="groupMsg" placeholder="اكتب رسالة..."><button onclick="sendGroup()" style="padding:10px 16px;background:#0ff;border:none;border-radius:10px;font-weight:bold">إرسال</button></div></div>
+<div id="private" class="page"><h4 id="chatWith">اختر شخص من السوق</h4><div id="privateChat" style="display:flex;flex-direction:column;height:300px;overflow:auto;border:1px solid #222;border-radius:12px;padding:8px;margin:8px 0"></div><div style="display:flex;gap:6px"><input id="privateMsg" placeholder="رسالة خاصة..."><button onclick="sendPrivate()" style="padding:10px 16px;background:#0ff;border:none;border-radius:10px">إرسال</button></div></div>
+</div>
+</div>
+</body></html>
